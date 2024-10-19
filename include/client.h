@@ -36,6 +36,6 @@ class Client {
         int IsAccepted();
         int SendMessage(std::string message);
         std::string ReceiveMessage();
-        int SendStream(int duration);
+        int SendStream();
         int ReceiveStream();
 };

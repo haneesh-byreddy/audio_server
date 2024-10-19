@@ -79,32 +79,36 @@ int Server::SendMessage(int accepted_fd, std::string message, int index) {
 }
 
 int Server::SendStream(int accepted_fd, int index) {
-    std::string filename = "recorded_audio_server.wav";
-    std::ifstream file(filename, std::ios::binary);
-    if (!file) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return -1;
+    pa_simple *s = nullptr;
+    int error;
+    static const pa_sample_spec ss = {
+        .format = PA_SAMPLE_S16LE,
+        .rate = 44100,
+        .channels = 2
+    };
+    s = pa_simple_new(NULL, "MyRecorder", PA_STREAM_RECORD, NULL, "record", &ss, NULL, NULL, &error);
+    if (!s) {
+        std::cerr << "pa_simple_new() failed: " << pa_strerror(error) << std::endl;
+        return 1;
     }
-    WAVHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(WAVHeader));
-    if (std::string(header.riff, 4) != "RIFF" || std::string(header.wave, 4) != "WAVE") {
-        std::cerr << "Not a valid WAV file" << std::endl;
-        return -1;
+    std::string audioData;
+    std::vector<uint8_t> buffer(1024);
+    for (int i=0; i<(5*44100*4/1024); i++) {
+        if (pa_simple_read(s, buffer.data(), buffer.size(), &error) < 0) {
+            std::cerr << "pa_simple_read() failed: " << pa_strerror(error) << std::endl;
+            break;
+        }
+        audioData.append(reinterpret_cast<char*>(buffer.data()), buffer.size());
     }
-
-    std::vector<char> buffer(header.data_size);
-    file.read(buffer.data(), header.data_size);
-
-    if (file.gcount() != header.data_size) {
-        std::cerr << "Failed to read all audio data" << std::endl;
-        return -1;
-    }
-
-    std::string audioData(buffer.begin(), buffer.end());
-    std::cout << "Audio file read successfully:" << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    Server::SendMessage(accepted_fd, audioData, index);
+    if (s) pa_simple_free(s);
+    std::cout << "Recorded " << audioData.size() << " bytes of audio data." << std::endl;
+    if (Server::SendMessage(accepted_fd, audioData, index)<0) std::cerr << "Error sending audio data" << std::endl;
+    ReceiveStream(accepted_fd, index);
     return 0;
+}
+
+void playAudioNonBlocking(const std::string& command) {
+    system(command.c_str());
 }
 
 int Server::ReceiveStream(int accepted_fd, int index) {
@@ -125,6 +129,9 @@ int Server::ReceiveStream(int accepted_fd, int index) {
     } else {
         std::cerr << "Failed to save audio data to file." << std::endl;
     }
+    std::string command = "aplay recorded_audio_server.wav";
+    std::thread audioThread(playAudioNonBlocking, command);
+    audioThread.detach();
     Server::SendStream(accepted_fd, index);
     return 0;
 }
@@ -134,7 +141,7 @@ int Server::ReceiveCommand(int accepted_fd, int index, Server& server) {
     while(true) {
         std::string received = Server::ReceiveMessage(accepted_fd, index);
         if (received.compare("")==0) break;
-        if (received.compare("rec")==0) Server::ReceiveStream(accepted_fd, index);
+        if (received.compare("call")==0) Server::ReceiveStream(accepted_fd, index);
     }
     return 0;
 }

@@ -71,8 +71,7 @@ int Client::SendMessage(std::string message) {
     return 0;
 }
 
-int Client::SendStream(int duration) {
-    SendMessage("rec");
+int Client::SendStream() {
     pa_simple *s = nullptr;
     int error;
     static const pa_sample_spec ss = {
@@ -87,7 +86,7 @@ int Client::SendStream(int duration) {
     }
     std::string audioData;
     std::vector<uint8_t> buffer(1024);
-    for (int i=0; i<(duration*44100*4/1024); i++) {
+    for (int i=0; i<(5*44100*4/1024); i++) {
         if (pa_simple_read(s, buffer.data(), buffer.size(), &error) < 0) {
             std::cerr << "pa_simple_read() failed: " << pa_strerror(error) << std::endl;
             break;
@@ -99,6 +98,10 @@ int Client::SendStream(int duration) {
     if (SendMessage(audioData)<0) std::cerr << "Error sending audio data" << std::endl;
     ReceiveStream();
     return 0;
+}
+
+void playAudioNonBlocking(const std::string& command) {
+    system(command.c_str());
 }
 
 int Client::ReceiveStream() {
@@ -113,10 +116,15 @@ int Client::ReceiveStream() {
     std::ofstream outFile("recorded_audio_client.wav", std::ios::binary);
     if (outFile) {
         outFile.write(reinterpret_cast<const char*>(&header), sizeof(WAVHeader));
+        
         outFile.write(audioData.data(), audioData.size());
         std::cout << "Audio data saved to 'recorded_audio.wav'" << std::endl;
     } else {
         std::cerr << "Failed to save audio data to file." << std::endl;
     }
+    std::string command = "aplay recorded_audio_client.wav";
+    std::thread audioThread(playAudioNonBlocking, command);
+    audioThread.detach();
+    SendStream();
     return 0;
 }
