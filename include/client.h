@@ -27,10 +27,11 @@ class Client {
             uint32_t sample_rate = 44100;
             uint32_t byterate;
             uint16_t block_align;
-            uint16_t bits_per_sample = 16;  // Assuming 16-bit audio
+            uint16_t bits_per_sample = 16;
             char data_chunk_header[4] = {'d', 'a', 't', 'a'};
             uint32_t data_size;
         };
+        std::string audioData;
 
         int Connect(std::string ip_addr, int port);
         int IsAccepted();
@@ -38,4 +39,5 @@ class Client {
         std::string ReceiveMessage();
         int SendStream();
         int ReceiveStream();
+        int RecordAudio();
 };

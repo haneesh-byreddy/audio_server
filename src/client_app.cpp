@@ -17,6 +17,8 @@ int main(int argc, char* argv[]) {
         getline(std::cin, message);
         if (message.compare("quit")==0) break;
         else if (message.compare(0,4,"call")==0) {
+            std::thread record(&Client::RecordAudio, &client);
+            record.detach();
             client.SendMessage("call");
             client.SendStream();
         }

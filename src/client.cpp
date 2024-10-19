@@ -71,7 +71,7 @@ int Client::SendMessage(std::string message) {
     return 0;
 }
 
-int Client::SendStream() {
+int Client::RecordAudio() {
     pa_simple *s = nullptr;
     int error;
     static const pa_sample_spec ss = {
@@ -84,9 +84,8 @@ int Client::SendStream() {
         std::cerr << "pa_simple_new() failed: " << pa_strerror(error) << std::endl;
         return 1;
     }
-    std::string audioData;
     std::vector<uint8_t> buffer(1024);
-    for (int i=0; i<(5*44100*4/1024); i++) {
+    while(true) {
         if (pa_simple_read(s, buffer.data(), buffer.size(), &error) < 0) {
             std::cerr << "pa_simple_read() failed: " << pa_strerror(error) << std::endl;
             break;
@@ -94,8 +93,13 @@ int Client::SendStream() {
         audioData.append(reinterpret_cast<char*>(buffer.data()), buffer.size());
     }
     if (s) pa_simple_free(s);
+}
+
+int Client::SendStream() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     std::cout << "Recorded " << audioData.size() << " bytes of audio data." << std::endl;
     if (SendMessage(audioData)<0) std::cerr << "Error sending audio data" << std::endl;
+    audioData = "";
     ReceiveStream();
     return 0;
 }
@@ -105,19 +109,19 @@ void playAudioNonBlocking(const std::string& command) {
 }
 
 int Client::ReceiveStream() {
-    std::string audioData = ReceiveMessage();
+    std::string ReceivedData = ReceiveMessage();
     
     WAVHeader header;
     header.byterate = header.sample_rate * header.channels * (header.bits_per_sample / 8);
     header.block_align = header.channels * (header.bits_per_sample / 8);
-    header.data_size = audioData.size();
+    header.data_size = ReceivedData.size();
     header.overall_size = header.data_size + sizeof(WAVHeader) - 8;
 
     std::ofstream outFile("recorded_audio_client.wav", std::ios::binary);
     if (outFile) {
         outFile.write(reinterpret_cast<const char*>(&header), sizeof(WAVHeader));
         
-        outFile.write(audioData.data(), audioData.size());
+        outFile.write(ReceivedData.data(), ReceivedData.size());
         std::cout << "Audio data saved to 'recorded_audio.wav'" << std::endl;
     } else {
         std::cerr << "Failed to save audio data to file." << std::endl;
