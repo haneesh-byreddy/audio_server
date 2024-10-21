@@ -11,6 +11,9 @@
 #include <pulse/simple.h>
 #include <pulse/error.h>
 
+
+static std::string audioData;
+
 class Server {
     public:
         struct WAVHeader {
@@ -36,4 +39,5 @@ class Server {
         static int SendStream(int fd, int index);
         static int ReceiveStream(int fd, int index);
         static int ReceiveCommand(int fd, int index, Server& Server);
+        static int RecordAudio();
 };

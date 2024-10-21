@@ -16,10 +16,13 @@ int main(int argc, char* argv[]) {
         std::cout<<"\033[32m->\033[0m ";
         getline(std::cin, message);
         if (message.compare("quit")==0) break;
-        else if (message.compare(0,3,"rec")==0) {
-            client.SendStream(stoi(message.substr(4)));
+        else if (message.compare(0,4,"call")==0) {
+            std::thread record(&Client::RecordAudio, &client);
+            record.detach();
+            client.SendMessage("call");
+            client.SendStream();
         }
-        else std::cout << "Invalid cmd supported : quit, rec" << std::endl;
+        else std::cout << "Invalid cmd supported : quit, call" << std::endl;
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
     close(client.client_socket);

@@ -78,53 +78,64 @@ int Server::SendMessage(int accepted_fd, std::string message, int index) {
     return 0;
 }
 
+int Server::RecordAudio() {
+    pa_simple *s = nullptr;
+    int error;
+    static const pa_sample_spec ss = {
+        .format = PA_SAMPLE_S16LE,
+        .rate = 44100,
+        .channels = 2
+    };
+    s = pa_simple_new(NULL, "MyRecorder", PA_STREAM_RECORD, NULL, "record", &ss, NULL, NULL, &error);
+    if (!s) {
+        std::cerr << "pa_simple_new() failed: " << pa_strerror(error) << std::endl;
+        return 1;
+    }
+    std::vector<uint8_t> buffer(1024);
+    while(true) {
+        if (pa_simple_read(s, buffer.data(), buffer.size(), &error) < 0) {
+            std::cerr << "pa_simple_read() failed: " << pa_strerror(error) << std::endl;
+            break;
+        }
+        audioData.append(reinterpret_cast<char*>(buffer.data()), buffer.size());
+    }
+    if (s) pa_simple_free(s);
+}
+
 int Server::SendStream(int accepted_fd, int index) {
-    std::string filename = "recorded_audio_server.wav";
-    std::ifstream file(filename, std::ios::binary);
-    if (!file) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return -1;
-    }
-    WAVHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(WAVHeader));
-    if (std::string(header.riff, 4) != "RIFF" || std::string(header.wave, 4) != "WAVE") {
-        std::cerr << "Not a valid WAV file" << std::endl;
-        return -1;
-    }
-
-    std::vector<char> buffer(header.data_size);
-    file.read(buffer.data(), header.data_size);
-
-    if (file.gcount() != header.data_size) {
-        std::cerr << "Failed to read all audio data" << std::endl;
-        return -1;
-    }
-
-    std::string audioData(buffer.begin(), buffer.end());
-    std::cout << "Audio file read successfully:" << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    Server::SendMessage(accepted_fd, audioData, index);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::cout << "Recorded " << audioData.size() << " bytes of audio data." << std::endl;
+    if (Server::SendMessage(accepted_fd, audioData, index)<0) std::cerr << "Error sending audio data" << std::endl;
+    audioData = "";
+    ReceiveStream(accepted_fd, index);
     return 0;
 }
 
+void playAudioNonBlocking(const std::string& command) {
+    system(command.c_str());
+}
+
 int Server::ReceiveStream(int accepted_fd, int index) {
-    std::string audioData = Server::ReceiveMessage(accepted_fd, index);
+    std::string ReceivedData = Server::ReceiveMessage(accepted_fd, index);
     
     WAVHeader header;
     header.byterate = header.sample_rate * header.channels * (header.bits_per_sample / 8);
     header.block_align = header.channels * (header.bits_per_sample / 8);
-    header.data_size = audioData.size();
+    header.data_size = ReceivedData.size();
     header.overall_size = header.data_size + sizeof(WAVHeader) - 8;
 
     std::ofstream outFile("recorded_audio_server.wav", std::ios::binary);
     if (outFile) {
         outFile.write(reinterpret_cast<const char*>(&header), sizeof(WAVHeader));
         
-        outFile.write(audioData.data(), audioData.size());
+        outFile.write(ReceivedData.data(), ReceivedData.size());
         std::cout << "Audio data saved to 'recorded_audio.wav'" << std::endl;
     } else {
         std::cerr << "Failed to save audio data to file." << std::endl;
     }
+    std::string command = "aplay recorded_audio_server.wav";
+    std::thread audioThread(playAudioNonBlocking, command);
+    audioThread.detach();
     Server::SendStream(accepted_fd, index);
     return 0;
 }
@@ -134,7 +145,10 @@ int Server::ReceiveCommand(int accepted_fd, int index, Server& server) {
     while(true) {
         std::string received = Server::ReceiveMessage(accepted_fd, index);
         if (received.compare("")==0) break;
-        if (received.compare("rec")==0) Server::ReceiveStream(accepted_fd, index);
+        if (received.compare("call")==0) {
+            std::thread record(&Server::RecordAudio);
+            Server::ReceiveStream(accepted_fd, index);
+        }
     }
     return 0;
 }
