@@ -8,7 +8,7 @@ int Client::Connect(std::string ipaddr, int port) {
     socket_addr.sin_addr.s_addr = inet_addr(ipaddr.c_str());
 
     if (connect(client_socket, (struct sockaddr*)&socket_addr, sizeof(socket_addr))==0){
-        std::cout << "Connected" << std::endl;
+        LOG(LOGGER_LEVEL_INFO, "Connected");
     }
     return 0;
 }
@@ -31,22 +31,15 @@ std::string Client::ReceiveMessage() {
         std::cerr << "Error: Invalid message size received." << std::endl;
         return "";
     }
-    float prev_percent = 0.0f, percent_threshold = 1.0f;
     do {
         if (remaining == 0) break;
         memset(chunk, 0, sizeof(chunk));
         curr_size = recv(client_socket, chunk, sizeof(chunk), 0);
         if (curr_size > 0) buffer.append(chunk, curr_size);
         remaining-=curr_size;
-        float curr_percent = ((float)(total_size-remaining)/total_size)*100;
-        if (curr_percent-prev_percent >= percent_threshold) {
-            prev_percent = curr_percent;
-            std::cout<<"\rPercentage: "<<(int)curr_percent<<"%"<<std::flush;
-        }
     } while (remaining > 0);
 
-    std::cout<<"\r"<<std::string(30, ' ')<<"\r";
-    std::cout << "Received size : " << buffer.length() << std::endl;
+    LOG(LOGGER_LEVEL_INFO, "Received Size : %d", buffer.length());
     std::string ack = "ACK";
     send(client_socket, ack.c_str(), ack.length(), 0);
     return buffer;
@@ -55,12 +48,12 @@ std::string Client::ReceiveMessage() {
 int Client::SendMessage(std::string message) {
     ssize_t n;
     size_t total_sent = 0, bytes_left = message.length();
-    std::cout << "Sending server Size : " << bytes_left << std::endl;
+    LOG(LOGGER_LEVEL_INFO, "Sending Server Size : %d", bytes_left);
     if (send(client_socket, &bytes_left, sizeof(bytes_left), 0) < 0) return -1;
     while (total_sent < message.length()) {
         n = send(client_socket, message.c_str()+total_sent, bytes_left, 0);
         if (n < 0) {
-            std::cout << "Sending failed" << std::endl;
+            LOG(LOGGER_LEVEL_INFO, "Sending failed");
             return -1;
         }
         total_sent+=n;
@@ -97,7 +90,7 @@ int Client::RecordAudio() {
 
 int Client::SendStream() {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    std::cout << "Recorded " << audioData.size() << " bytes of audio data." << std::endl;
+    LOG(LOGGER_LEVEL_INFO, "Recorded %d bytes of audio data", audioData.size());
     if (SendMessage(audioData)<0) std::cerr << "Error sending audio data" << std::endl;
     audioData = "";
     ReceiveStream();
@@ -122,9 +115,9 @@ int Client::ReceiveStream() {
         outFile.write(reinterpret_cast<const char*>(&header), sizeof(WAVHeader));
         
         outFile.write(ReceivedData.data(), ReceivedData.size());
-        std::cout << "Audio data saved to 'recorded_audio.wav'" << std::endl;
+        LOG(LOGGER_LEVEL_INFO, "Audio data saved to 'recorded_audio_client.wav'");
     } else {
-        std::cerr << "Failed to save audio data to file." << std::endl;
+        LOG(LOGGER_LEVEL_INFO, "Failed to save audio data to file.");
     }
     std::string command = "aplay recorded_audio_client.wav";
     std::thread audioThread(playAudioNonBlocking, command);

@@ -2,7 +2,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cerr<<"Usage: "<<argv[0]<<" <IP> <PORT>"<<std::endl;
+        LOG(LOGGER_LEVEL_INFO, "Usage: ./%s <IP> <PORT>", argv[0]);
         return 1;
     }
     std::string ip = argv[1];
@@ -22,10 +22,10 @@ int main(int argc, char* argv[]) {
             client.SendMessage("call");
             client.SendStream();
         }
-        else std::cout << "Invalid cmd supported : quit, call" << std::endl;
+        LOG(LOGGER_LEVEL_INFO, "Invalid cmd, supported : quit, call");
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
     close(client.client_socket);
-    std::cout << "Closed socket" << std::endl;
+    LOG(LOGGER_LEVEL_INFO, "Closed socket");
     return 0;
 }

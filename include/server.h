@@ -10,6 +10,7 @@
 #include <vector>
 #include <pulse/simple.h>
 #include <pulse/error.h>
+#include "logger.h"
 
 
 static std::string audioData;
@@ -27,7 +28,7 @@ class Server {
             uint32_t sample_rate = 44100;
             uint32_t byterate;
             uint16_t block_align;
-            uint16_t bits_per_sample = 16;  // Assuming 16-bit audio
+            uint16_t bits_per_sample = 16;
             char data_chunk_header[4] = {'d', 'a', 't', 'a'};
             uint32_t data_size;
         };

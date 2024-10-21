@@ -25,10 +25,10 @@ do { \
 
 static inline const char* log_level_to_string(int level) {
     switch (level) {
-        case LOG_LEVEL_DEBUG: return "DEBUG";
-        case LOG_LEVEL_INFO:  return "INFO";
-        case LOG_LEVEL_WARN:  return "WARN";
-        case LOG_LEVEL_ERROR: return "ERROR";
+        case LOGGER_LEVEL_DEBUG: return "DEBUG";
+        case LOGGER_LEVEL_INFO:  return "INFO";
+        case LOGGER_LEVEL_WARN:  return "WARN";
+        case LOGGER_LEVEL_ERROR: return "ERROR";
         default: return "UNKNOWN";
     }
 }

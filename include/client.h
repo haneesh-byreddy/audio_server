@@ -11,6 +11,7 @@
 #include <vector>
 #include <pulse/simple.h>
 #include <pulse/error.h>
+#include "logger.h"
 
 class Client {
     public:
